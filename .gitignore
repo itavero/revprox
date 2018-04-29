@@ -1,5 +1,7 @@
 # Inspired by https://www.gitignore.io/api/git,macos,python,windows,jetbrains+all,notepadpp
 
+.notes.md
+
 ### Git ###
 *.orig
 

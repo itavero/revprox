@@ -1,0 +1,6 @@
+pyyaml==3.12
+sewer==0.5.2
+inquirer==2.2.0
+GitPython==2.1.9
+python-nginx==1.4.1
+blessings==1.6.1
