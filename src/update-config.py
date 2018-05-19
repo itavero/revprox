@@ -12,6 +12,7 @@ import traceback
 from datetime import datetime, timedelta
 from OpenSSL import crypto
 import nginx
+from shutil import which
 
 
 def create_dir(directory_path):
@@ -113,7 +114,7 @@ def create_nginx_config_for_domain(domain, subdomains, subdomain_dir, forward_ot
         if use_ssl:
             others.add(
                 nginx.Comment('use_ssl = True'),
-                nginx.Key('listen', '443 default_server ssl'),
+                nginx.Key('listen', '443 ssl'),
                 nginx.Key('ssl', 'on'),
                 nginx.Key('ssl_certificate', str(cert_dir / 'certificate.crt')),
                 nginx.Key('ssl_certificate_key', str(cert_dir / 'certificate.key'))
@@ -148,7 +149,7 @@ def create_nginx_config_for_subdomain(domain, subdomain, destination, use_ssl, f
         proto = 'https'
         main.add(
             nginx.Comment('use_ssl = True'),
-            nginx.Key('listen', '443 default_server ssl'),
+            nginx.Key('listen', '443 ssl'),
             nginx.Key('ssl', 'on'),
             nginx.Key('ssl_certificate', str(cert_dir / 'certificate.crt')),
             nginx.Key('ssl_certificate_key', str(cert_dir / 'certificate.key'))
@@ -214,7 +215,8 @@ with open(config_file, 'r') as stream:
 
 if config is None:
     sys.exit('{t.normal}{t.bold}{t.red}Failed to load config.{t.normal}'.format(t=Terminal()))
-pprint.pprint(repr(config))
+# Uncomment the following line for development/debugging purposes
+# pprint.pprint(repr(config))
 
 # Process DNS providers
 dns_types = all_available_dns_types()
@@ -275,7 +277,8 @@ for (domain, cfg) in config['domains'].items():
                         t=Terminal(), domain=domain, dns=dns_key))
                     continue
             if not get_certs(cert_domain, domain_cert, dns_class, ssl_email):
-                print('{t.normal}{t.red}{t.bold}Failed to get certificates for "{domain}".{t.normal}'.format(t=Terminal(), domain=domain))
+                print('{t.normal}{t.red}{t.bold}Failed to get certificates for "{domain}".{t.normal}'.format(
+                    t=Terminal(), domain=domain))
                 continue
 
         # NGINX config
@@ -309,8 +312,24 @@ for domain in domain_names:
     rp_config.add(nginx.Key('include', str(nginx_path / domain / 'main.cfg')))
 nginx.dumpf(rp_config, str(nginx_path / 'revprox.cfg'))
 
+# Clean up old, unused configuration files
+# TODO clean up
+
+# Validate new configuration
+# TODO nginx -t -c whatever.conf
+
 # Check if NGINX will use configuration
 # TODO create check
 
 # Restart NGINX with new configuration
-# TODO restart nginx
+is_restarted = False
+# - FreeBSD (and possibly others)
+service_manager = which('service')
+if service_manager not None:
+    exit_code = os.system('{program} nginx restart'.format(program=service_manager))
+    is_restarted = exit_code == 0
+
+if is_restarted:
+    print('{t.normal}Restart NGINX: {t.green}{t.bold}SUCCESS{t.normal}'.format(t=Terminal())
+else:
+    print('{t.normal}Restart NGINX: {t.red}{t.bold}UNKNOWN{t.normal} - {t.bold}Please restart NGINX manually!{t.normal}'.format(t=Terminal())
