@@ -43,6 +43,19 @@ def all_available_dns_types():
     return result
 
 
+def should_renew_cert(cert_file):
+    if cert_file.exists():
+        existing_cert = None
+        with open(cert_file, 'r') as stream:
+            existing_cert = crypto.load_certificate(crypto.FILETYPE_PEM, stream.read())
+        expire_date = datetime.strptime(
+            existing_cert.get_notAfter().decode("utf-8"), "%Y%m%d%H%M%SZ")
+        threshold = datetime.now() + timedelta(weeks=+2)
+        if expire_date < threshold:
+            return True
+    return False
+
+
 def get_certs(domain, cert_dir, dns_class, email):
     try:
         create_dir(cert_dir)
@@ -54,25 +67,21 @@ def get_certs(domain, cert_dir, dns_class, email):
         renew = False
         account_key = None
         if cert_file.exists() and cert_key_file.exists() and account_key_file.exists():
-            existing_cert = None
-            with open(cert_file, 'r') as stream:
-                existing_cert = crypto.load_certificate(crypto.FILETYPE_PEM, stream.read())
-            expire_date = datetime.strptime(
-                existing_cert.get_notAfter().decode("utf-8"), "%Y%m%d%H%M%SZ")
-            threshold = datetime.now() + timedelta(weeks=+4)
-            if expire_date > threshold:
-                print('{t.normal}Certificates for {t.magenta}{t.bold}{domain}{t.normal} will not expire until {t.magenta}{t.bold}{expire}{t.normal}. Not renewing at this moment.'.format(
-                    t=Terminal(), domain=domain, expire=expire_date))
+            renew = should_renew_cert(cert_file)
+            if not renew:
                 return True
-            renew = True
             with open(account_key_file, 'r') as stream:
                 account_key = stream.read()
 
         client = sewer.Client(domain_name=domain, dns_class=dns_class, account_key=account_key)
         certificate = None
         if renew:
+            print('{t.normal}Renewing certificate for {t.magenta}{t.bold}{domain}{t.normal}...'.format(
+                t=Terminal(), domain=domain))
             certificate = client.renew()
         else:
+            print('{t.normal}Requesting new certificate for {t.magenta}{t.bold}{domain}{t.normal}...'.format(
+                t=Terminal(), domain=domain))
             certificate = client.cert()
         certificate_key = client.certificate_key
 
@@ -195,11 +204,23 @@ repo.remotes.origin.fetch()
 repo.git.reset('--hard', repo.active_branch.tracking_branch().name)
 new_hash = repo.head.object.hexsha
 
+generate_config = args.forced
 if old_hash != new_hash:
+    generate_config = True
     print('{t.normal}Detected change on {t.bold}{t.yellow}{branch}{t.normal}. Updated from {t.bold}{t.magenta}{old}{t.normal} to {t.bold}{t.magenta}{new}{t.normal}.'.format(
         t=Terminal(), branch=repo.active_branch.name, old=old_hash, new=new_hash))
-elif not args.forced:
-    sys.exit()
+
+if not generate_config:
+    # Quick scan for certificates that should be renewed
+    renew_certificates = False
+    for cert in cert_path.glob('**/*.cert'):
+        print(str(cert))
+        if should_renew_cert(cert):
+            renew_certificates = True
+            break
+    if not renew_certificates:
+        # No need to continue
+        sys.exit()
 
 # Read config file
 config_file = repo_path / 'config.yml'
@@ -281,36 +302,38 @@ for (domain, cfg) in config['domains'].items():
                     t=Terminal(), domain=domain))
                 continue
 
-        # NGINX config
-        subdomains = []
-        for (subdomain, destination) in cfg['subdomains'].items():
-            sub_cfg = create_nginx_config_for_subdomain(
-                domain, subdomain, destination, use_ssl, force_ssl, domain_cert)
-            nginx.dumpf(sub_cfg, str(subdomain_nginx / '{}.cfg'.format(subdomain)))
-            subdomains.append(subdomain)
+        if generate_config:
+            # NGINX config
+            subdomains = []
+            for (subdomain, destination) in cfg['subdomains'].items():
+                sub_cfg = create_nginx_config_for_subdomain(
+                    domain, subdomain, destination, use_ssl, force_ssl, domain_cert)
+                nginx.dumpf(sub_cfg, str(subdomain_nginx / '{}.cfg'.format(subdomain)))
+                subdomains.append(subdomain)
 
-        # Forward others?
-        forward_others = None
-        if 'forward_others' in cfg and cfg['forward_others']:
-            forward_others = cfg['forward_others']
+            # Forward others?
+            forward_others = None
+            if 'forward_others' in cfg and cfg['forward_others']:
+                forward_others = cfg['forward_others']
 
-        main_cfg = create_nginx_config_for_domain(
-            domain, subdomains, subdomain_nginx, forward_others, use_ssl, domain_cert)
-        nginx.dumpf(main_cfg, str(domain_nginx / 'main.cfg'))
-        domain_names.append(domain)
+            main_cfg = create_nginx_config_for_domain(
+                domain, subdomains, subdomain_nginx, forward_others, use_ssl, domain_cert)
+            nginx.dumpf(main_cfg, str(domain_nginx / 'main.cfg'))
+            domain_names.append(domain)
     except:
         print('{t.normal}Processing failed for domain {t.bold}{t.magenta}{domain}{t.normal}.\n{t.red}{error}{t.normal}'.format(
             t=Terminal(), domain=domain, error=traceback.format_exc()))
 
 # Generate main revprox NGINX config file
-rp_config = nginx.Conf()
-rp_config.add(
-    nginx.Comment(generation_comment('Main configuration', 'NGINX')),
-    nginx.Comment('This file needs to be included in your NGINX configuration.')
-)
-for domain in domain_names:
-    rp_config.add(nginx.Key('include', str(nginx_path / domain / 'main.cfg')))
-nginx.dumpf(rp_config, str(nginx_path / 'revprox.cfg'))
+if generate_config:
+    rp_config = nginx.Conf()
+    rp_config.add(
+        nginx.Comment(generation_comment('Main configuration', 'NGINX')),
+        nginx.Comment('This file needs to be included in your NGINX configuration.')
+    )
+    for domain in domain_names:
+        rp_config.add(nginx.Key('include', str(nginx_path / domain / 'main.cfg')))
+    nginx.dumpf(rp_config, str(nginx_path / 'revprox.cfg'))
 
 # Clean up old, unused configuration files
 # TODO clean up
@@ -322,14 +345,15 @@ nginx.dumpf(rp_config, str(nginx_path / 'revprox.cfg'))
 # TODO create check
 
 # Restart NGINX with new configuration
-is_restarted = False
-# - FreeBSD (and possibly others)
-service_manager = which('service')
-if service_manager not None:
-    exit_code = os.system('{program} nginx restart'.format(program=service_manager))
-    is_restarted = exit_code == 0
+if generate_config:
+    is_restarted = False
+    # - FreeBSD (and possibly others)
+    service_manager = which('service')
+    if service_manager is not None:
+        exit_code = os.system('{program} nginx restart'.format(program=service_manager))
+        is_restarted = exit_code == 0
 
-if is_restarted:
-    print('{t.normal}Restart NGINX: {t.green}{t.bold}SUCCESS{t.normal}'.format(t=Terminal())
-else:
-    print('{t.normal}Restart NGINX: {t.red}{t.bold}UNKNOWN{t.normal} - {t.bold}Please restart NGINX manually!{t.normal}'.format(t=Terminal())
+    if is_restarted:
+        print('{t.normal}Restart NGINX: {t.green}{t.bold}SUCCESS{t.normal}'.format(t=Terminal()))
+    else:
+        print('{t.normal}Restart NGINX: {t.red}{t.bold}FAILED{t.normal} - {t.bold}Please restart NGINX manually!{t.normal}'.format(t=Terminal()))
