@@ -84,6 +84,7 @@ def get_certs(domain, cert_dir, dns_class, email):
             account_key = client.account_key
             with open(account_key_file, 'w') as f:
                 f.write(account_key)
+        return True
     except Exception:
         print('{t.normal}{t.bold}{t.red}Failed to get certificate for domain {domain}, due to error: {e}{t.normal}'.format(
             t=Terminal(), e=traceback.format_exc(), domain=domain))
@@ -274,6 +275,7 @@ for (domain, cfg) in config['domains'].items():
                         t=Terminal(), domain=domain, dns=dns_key))
                     continue
             if not get_certs(cert_domain, domain_cert, dns_class, ssl_email):
+                print('{t.normal}{t.red}{t.bold}Failed to get certificates for "{domain}".{t.normal}'.format(t=Terminal(), domain=domain))
                 continue
 
         # NGINX config
