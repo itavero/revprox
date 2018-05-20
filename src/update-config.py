@@ -170,6 +170,8 @@ def create_nginx_config_for_subdomain(domain, subdomain, destination, use_ssl, f
                        nginx.Key('proxy_set_header', 'X-Real-IP $remote_addr'),
                        nginx.Key('proxy_set_header', 'X-Forwarded-For $proxy_add_x_forwarded_for'),
                        nginx.Key('proxy_set_header', 'X-Forwarded-Proto $scheme'),
+                       nginx.Key('proxy_set_header', 'Upgrade $http_upgrade'),
+                       nginx.Key('proxy_set_header', 'Connection $connection_upgrade'),
                        nginx.Key('proxy_pass', destination),
                        nginx.Key('proxy_read_timeout', '90'),
                        nginx.Key('proxy_redirect',
@@ -327,9 +329,15 @@ for (domain, cfg) in config['domains'].items():
 # Generate main revprox NGINX config file
 if generate_config:
     rp_config = nginx.Conf()
+    map = nginx.Map('$http_upgrade $connection_upgrade')
+    map.add(
+        nginx.Key('default', 'upgrade'),
+        nginx.Key('\'\'', 'close')
+    )
     rp_config.add(
         nginx.Comment(generation_comment('Main configuration', 'NGINX')),
-        nginx.Comment('This file needs to be included in your NGINX configuration.')
+        nginx.Comment('This file needs to be included in your NGINX configuration.'),
+        map
     )
     for domain in domain_names:
         rp_config.add(nginx.Key('include', str(nginx_path / domain / 'main.cfg')))
