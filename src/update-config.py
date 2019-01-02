@@ -353,7 +353,7 @@ if generate_config:
 # TODO create check
 
 # Restart NGINX with new configuration
-if generate_config:
+if generate_config or renew_certificates:
     is_restarted = False
     # - FreeBSD (and possibly others)
     service_manager = which('service')
