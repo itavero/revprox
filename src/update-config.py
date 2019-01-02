@@ -212,9 +212,9 @@ if old_hash != new_hash:
     print('{t.normal}Detected change on {t.bold}{t.yellow}{branch}{t.normal}. Updated from {t.bold}{t.magenta}{old}{t.normal} to {t.bold}{t.magenta}{new}{t.normal}.'.format(
         t=Terminal(), branch=repo.active_branch.name, old=old_hash, new=new_hash))
 
+renew_certificates = False
 if not generate_config:
     # Quick scan for certificates that should be renewed
-    renew_certificates = False
     for cert in cert_path.glob('**/*.crt'):
         print(str(cert))
         if should_renew_cert(cert):
