@@ -215,7 +215,7 @@ if old_hash != new_hash:
 if not generate_config:
     # Quick scan for certificates that should be renewed
     renew_certificates = False
-    for cert in cert_path.glob('**/*.cert'):
+    for cert in cert_path.glob('**/*.crt'):
         print(str(cert))
         if should_renew_cert(cert):
             renew_certificates = True
