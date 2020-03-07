@@ -37,9 +37,13 @@ def all_subclasses(cls):
 def all_available_dns_types():
     result = {}
     for cls in all_subclasses(sewer.BaseDns):
-        if not cls.dns_provider_name:
-            continue
-        result[cls.dns_provider_name] = cls
+        key = cls.__name__
+        try:
+            if cls.dns_provider_name:
+                key = cls.dns_provider_name
+        except AttributeError:
+            print('{t.normal}No DNS provider name in class {t.bold}{name}'.format(t=Terminal(), name=key))
+        result[key] = cls
     return result
 
 
@@ -216,7 +220,6 @@ renew_certificates = False
 if not generate_config:
     # Quick scan for certificates that should be renewed
     for cert in cert_path.glob('**/*.crt'):
-        print(str(cert))
         if should_renew_cert(cert):
             renew_certificates = True
             break
@@ -231,7 +234,7 @@ if not config_file.exists():
 config = None
 with open(config_file, 'r') as stream:
     try:
-        config = yaml.load(stream)
+        config = yaml.safe_load(stream)
     except yaml.YAMLError as exc:
         sys.exit('{t.normal}{t.bold}{t.red}Failed to load config, due to error: {e}{t.normal}'.format(
             t=Terminal(), e=exc))
@@ -343,11 +346,15 @@ if generate_config:
         rp_config.add(nginx.Key('include', str(nginx_path / domain / 'main.cfg')))
     nginx.dumpf(rp_config, str(nginx_path / 'revprox.cfg'))
 
+
 # Clean up old, unused configuration files
 # TODO clean up
 
 # Validate new configuration
-# TODO nginx -t -c whatever.conf
+nginx_exec = which('nginx')
+if nginx_exec is not None:
+    if os.system('{exec} -t'.format(exec=nginx_exec)) > 0:
+        sys.exit('{t.normal}NGINX config {t.red}{t.bold}INVALID{t.normal} - {t.bold}Please fix this manually!{t.normal}'.format(t=Terminal()))
 
 # Check if NGINX will use configuration
 # TODO create check

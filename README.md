@@ -8,10 +8,6 @@ Based on / uses:
 * [Sewer](https://github.com/komuw/sewer)
 * [YAML](http://yaml.org/)
 
-_Do note that this list may likely change while development is still in progress._
-
 ## :warning: Current state
-Nothing here yet. :wink:
-
-I'm still working on an initial version, which will focus on preparing and
-maintaining a FreeNAS Jail as a Reverse Proxy.
+I have been using this for quite some time now in a jail on my FreeNAS system, but I'm still facing some issues with the auto renewal.
+Besides that more documentation is probably needed (now there is only an `example-config.yml` and that's pretty much it).
