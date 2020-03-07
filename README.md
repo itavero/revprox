@@ -11,3 +11,12 @@ Based on / uses:
 ## :warning: Current state
 I have been using this for quite some time now in a jail on my FreeNAS system, but I'm still facing some issues with the auto renewal.
 Besides that more documentation is probably needed (now there is only an `example-config.yml` and that's pretty much it).
+
+The update script is also not yet added to the crontab automatically.
+
+## Setup
+* Create a new, private Git repository. I currently use GitLab, but any other service will probably also work (GitHub, Bitbucket, ...)
+* Generate an access token that can read the aforementioned repository (link for [GitLab](https://gitlab.com/profile/personal_access_tokens) / [GitHub](https://github.com/settings/tokens) / [Bitbucket](https://confluence.atlassian.com/bitbucket/app-passwords-828781300.html#Apppasswords-Createanapppassword) )
+* Clone/download the repository to the machine running NGINX (I'm assuming it's already installed).
+* Run `src/setup.py` and follow the instructions.
+* TODO: Add instructions for update script cron as it is not yet in the script itself.

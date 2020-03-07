@@ -1,5 +1,5 @@
 pyyaml==5.3
-sewer==0.7.3
+sewer==0.8.0
 prompt_toolkit==3.0.4
 GitPython==3.1.0
 python-nginx==1.5.3
