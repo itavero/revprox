@@ -1,3 +1,7 @@
+> This repository is **ARCHIVED**.
+> I used to use NGINX in a jail on my FreeNAS system, but I'm switching to Ubuntu Server with Docker and Traefik as a reverse proxy.
+> Traefik can already do what this script does out of the box, so I won't need this script anymore.
+
 # :arrow_right_hook: revprox
 Set of scripts to allow for an easy set-up of a reverse proxy with SSL support,
 so you can access all your hobby projects running at home without having to
